@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import type { CardInst, RunState } from '../engine/types';
 import { CARDS, cardBaseCost, cardHeat, cardText } from '../engine/data/cards';
 import { ALGOS } from '../engine/data/algos';
@@ -42,11 +42,26 @@ export function Rich({ text }: { text: string }) {
   );
 }
 
+function fitTip(el: HTMLElement | null): void {
+  const wrap = el?.parentElement;
+  if (!el || !wrap) return;
+  const wr = wrap.getBoundingClientRect();
+  const width = el.offsetWidth;
+  const left = wr.left + wr.width / 2 - width / 2;
+  const right = left + width;
+  const pad = 8;
+  let shift = 0;
+  if (left < pad) shift = pad - left;
+  else if (right > window.innerWidth - pad) shift = window.innerWidth - pad - right;
+  el.style.setProperty('--tip-shift', `${Math.round(shift)}px`);
+}
+
 export function Tip({ tip, children, wide }: { tip: ComponentChildren; children: ComponentChildren; wide?: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
   return (
-    <span class="tip-wrap" tabIndex={0}>
+    <span class="tip-wrap" tabIndex={0} onMouseEnter={() => fitTip(ref.current)} onFocus={() => fitTip(ref.current)}>
       {children}
-      <span class={`tip ${wide ? 'tip-wide' : ''}`} role="tooltip">
+      <span class={`tip ${wide ? 'tip-wide' : ''}`} role="tooltip" ref={ref}>
         {tip}
       </span>
     </span>

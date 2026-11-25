@@ -203,7 +203,7 @@ kbd {
   position: absolute;
   bottom: calc(100% + 8px);
   left: 50%;
-  transform: translateX(-50%) translateY(4px);
+  transform: translateX(calc(-50% + var(--tip-shift, 0px))) translateY(4px);
   width: max-content;
   max-width: 260px;
   background: #1c2836;
@@ -235,15 +235,7 @@ kbd {
 .tip-wrap:hover .tip,
 .tip-wrap:focus-within .tip {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-.sess-side .tip {
-  left: auto;
-  right: 0;
-  transform: translateY(4px);
-}
-.sess-side .tip-wrap:hover .tip {
-  transform: translateY(0);
+  transform: translateX(calc(-50% + var(--tip-shift, 0px))) translateY(0);
 }
 .sess-side .tip-wrap {
   display: flex;
@@ -425,16 +417,7 @@ kbd {
   min-height: 100vh;
   overflow-x: clip;
 }
-.piles .tip,
-.tb-right .tip {
-  left: auto;
-  right: 0;
-  transform: translateY(4px);
-}
-.piles .tip-wrap:hover .tip,
-.tb-right .tip-wrap:hover .tip {
-  transform: translateY(0);
-}
+
 .topbar {
   position: sticky;
   top: 0;
