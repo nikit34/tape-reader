@@ -1,0 +1,286 @@
+:root {
+  --bg: #0b0f14;
+  --panel: #121a23;
+  --line: #213041;
+  --line2: #2b3d52;
+  --text: #d7e1ea;
+  --muted: #8b99a8;
+  --green: #2ee59d;
+  --blue: #4cc9f0;
+  --amber: #ffc857;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1000px 500px at 85% -10%, rgba(76, 201, 240, 0.08), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font-family: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 16px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 18px;
+}
+
+.kicker {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--blue);
+}
+
+h1 {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(34px, 6vw, 54px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin: 4px 0 6px;
+  line-height: 1;
+}
+
+h1 span {
+  color: var(--green);
+}
+
+.logline {
+  margin: 0;
+  color: var(--muted);
+  font-size: 17px;
+  max-width: 620px;
+}
+
+.links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  display: inline-block;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line2);
+  background: var(--panel);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.btn:hover {
+  border-color: var(--blue);
+}
+
+.btn.primary {
+  background: linear-gradient(180deg, #34f0a8, #1fc985);
+  color: #06170f;
+  border-color: transparent;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.facts div {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.facts dt {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 2px 0 0;
+  font-weight: 700;
+}
+
+.cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
+h2 {
+  font-size: 17px;
+  color: var(--amber);
+  margin: 14px 0 6px;
+}
+
+section > h2:first-child,
+.cols section > h2:first-child {
+  margin-top: 0;
+}
+
+h3 {
+  font-size: 15px;
+  margin: 0 0 6px;
+  color: var(--blue);
+}
+
+p {
+  margin: 0 0 8px;
+}
+
+ul,
+ol {
+  margin: 0 0 6px;
+  padding-left: 20px;
+}
+
+li {
+  margin-bottom: 5px;
+}
+
+b {
+  color: #fff;
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.scope {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.scope th,
+.scope td {
+  text-align: left;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.scope th {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.scope td:nth-child(3) {
+  color: var(--green);
+}
+
+.note {
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.months {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.months article {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.result {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
+@media (max-width: 760px) {
+  .cols,
+  .two {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  :root {
+    --bg: #fff;
+    --panel: #f6f8fa;
+    --line: #dde3ea;
+    --line2: #c9d2dc;
+    --text: #111;
+    --muted: #555;
+    --green: #0a8f5a;
+    --blue: #0b6f99;
+    --amber: #9a6400;
+    color-scheme: light;
+  }
+  body {
+    background: #fff;
+    font-size: 11px;
+  }
+  b {
+    color: #000;
+  }
+  .page {
+    padding: 0;
+    gap: 10px;
+  }
+  .links {
+    display: none;
+  }
+  h1 {
+    font-size: 30px;
+  }
+  h2 {
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .onepager .cols {
+    gap: 18px;
+  }
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+}
