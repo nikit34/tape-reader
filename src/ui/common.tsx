@@ -71,6 +71,7 @@ export function CardView({
   small,
   reason,
   extraClass,
+  onHover,
 }: {
   id: string;
   up: boolean;
@@ -81,6 +82,7 @@ export function CardView({
   small?: boolean;
   reason?: string | null;
   extraClass?: string;
+  onHover?: (on: boolean) => void;
 }) {
   const d = CARDS[id];
   const base = cardBaseCost(id, up);
@@ -91,9 +93,13 @@ export function CardView({
       type="button"
       class={`card type-${d.type} rarity-${d.rarity} ${up ? 'is-up' : ''} ${disabled ? 'is-disabled' : ''} ${small ? 'is-small' : ''} ${extraClass ?? ''}`}
       onClick={onClick}
-      title={reason ?? undefined}
       aria-disabled={disabled}
+      onMouseEnter={onHover ? () => onHover(true) : undefined}
+      onMouseLeave={onHover ? () => onHover(false) : undefined}
+      onFocus={onHover ? () => onHover(true) : undefined}
+      onBlur={onHover ? () => onHover(false) : undefined}
     >
+      {disabled && reason && <span class="card-reason">{reason}</span>}
       <span class={`card-cost ${c < base ? 'cheaper' : ''}`}>{c}</span>
       {hotkey !== undefined && <span class="card-key">{hotkey}</span>}
       {(d.rarity === 'uncommon' || d.rarity === 'rare') && <span class={`card-gem gem-${d.rarity}`} title={d.rarity} />}

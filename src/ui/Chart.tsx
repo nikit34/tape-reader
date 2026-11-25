@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Candle, SessionState } from '../engine/types';
 import { effMove } from '../engine/ops';
 import { isNewsVisible } from '../engine/game';
+import type { Preview } from '../engine/preview';
 
 const C = {
   bg: '#0d131a',
@@ -33,7 +34,7 @@ function drawRound(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-function render(ctx: CanvasRenderingContext2D, s: SessionState, w: number, h: number, p: number) {
+function render(ctx: CanvasRenderingContext2D, s: SessionState, w: number, h: number, p: number, pv: Preview | null) {
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = C.bg;
   ctx.fillRect(0, 0, w, h);
@@ -71,6 +72,19 @@ function render(ctx: CanvasRenderingContext2D, s: SessionState, w: number, h: nu
   }
   min = Math.min(min, s.price);
   max = Math.max(max, s.price);
+  if (pv) {
+    if (pv.nudge) {
+      min = Math.min(min, s.price + pv.nudge - 2);
+      max = Math.max(max, s.price + pv.nudge + 2);
+    }
+    for (const g of pv.ghosts) {
+      if (g.kind === 'straddle') {
+        const need = 3 / Math.max(1, g.size);
+        min = Math.min(min, s.price - need - 2);
+        max = Math.max(max, s.price + need + 2);
+      }
+    }
+  }
   const span = Math.max(14, max - min);
   const mid = (max + min) / 2;
   min = mid - span * 0.62;
@@ -204,13 +218,117 @@ function render(ctx: CanvasRenderingContext2D, s: SessionState, w: number, h: nu
     ctx.globalAlpha = 1;
   });
 
+  if (pv && s.status === 'play') {
+    const gx1 = padL + cw * (nPre + s.bar);
+    const py0 = y(s.price);
+    pv.ghosts.forEach((g, gi) => {
+      const gx2 = Math.min(w - padR, padL + cw * (nPre + s.bar + g.bars));
+      if (g.kind === 'straddle') {
+        const need = 3 / Math.max(1, g.size);
+        const yHi = y(s.price + need);
+        const yLo = y(s.price - need);
+        ctx.fillStyle = 'rgba(179,136,255,0.10)';
+        ctx.fillRect(gx1, padT, gx2 - gx1, yHi - padT);
+        ctx.fillRect(gx1, yLo, gx2 - gx1, h - padB - yLo);
+        ctx.fillStyle = 'rgba(140,150,170,0.06)';
+        ctx.fillRect(gx1, yHi, gx2 - gx1, yLo - yHi);
+      } else if (gi === 0) {
+        const good = g.dir > 0 ? 'rgba(46,229,157,0.09)' : 'rgba(255,92,122,0.08)';
+        const bad = g.dir > 0 ? 'rgba(255,92,122,0.06)' : 'rgba(46,229,157,0.06)';
+        ctx.fillStyle = g.dir > 0 ? good : bad;
+        ctx.fillRect(gx1, padT, gx2 - gx1, py0 - padT);
+        ctx.fillStyle = g.dir > 0 ? bad : good;
+        ctx.fillRect(gx1, py0, gx2 - gx1, h - padB - py0);
+        ctx.font = '700 10px "JetBrains Mono", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = C.up;
+        ctx.fillText(g.dir > 0 ? `+${g.size} per point up` : `+${g.size} per point down`, gx1 + 6, g.dir > 0 ? padT + 12 : h - padB - 10);
+        ctx.fillStyle = C.down;
+        ctx.fillText(g.dir > 0 ? `−${g.size} per point down` : `−${g.size} per point up`, gx1 + 6, g.dir > 0 ? h - padB - 10 : padT + 12);
+      }
+      const col = g.kind === 'straddle' ? C.violet : g.dir > 0 ? C.up : C.down;
+      const yy = Math.round(py0) + 0.5 + gi * 3;
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(gx1, yy);
+      ctx.lineTo(gx2, yy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(gx2, yy - 6);
+      ctx.lineTo(gx2, yy + 6);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    });
+    for (const i of pv.reveal) {
+      const x0 = padL + cw * (nPre + i) + cw * 0.12;
+      const ww = cw * 0.76;
+      ctx.strokeStyle = 'rgba(76,201,240,0.95)';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = 'rgba(76,201,240,0.8)';
+      ctx.shadowBlur = 8;
+      ctx.strokeRect(x0 + 1, padT + 1, ww - 2, plotH - 2);
+      ctx.shadowBlur = 0;
+      if (!s.revealed.includes(i)) {
+        ctx.fillStyle = 'rgba(76,201,240,0.9)';
+        ctx.font = '800 14px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('?', x0 + ww / 2, padT + plotH / 2);
+      }
+    }
+    if (pv.nudge) {
+      const cx = padL + cw * (nPre + s.bar + 0.5);
+      const yA = y(s.price);
+      const yB = y(s.price + pv.nudge);
+      ctx.strokeStyle = C.amber;
+      ctx.fillStyle = C.amber;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(cx, yA);
+      ctx.lineTo(cx, yB);
+      ctx.stroke();
+      const dir = pv.nudge > 0 ? -1 : 1;
+      ctx.beginPath();
+      ctx.moveTo(cx, yB);
+      ctx.lineTo(cx - 6, yB - dir * 8);
+      ctx.lineTo(cx + 6, yB - dir * 8);
+      ctx.fill();
+      ctx.font = '800 11px "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${pv.nudge > 0 ? '+' : '−'}${Math.abs(pv.nudge)}`, cx + 8, yB);
+    }
+  }
+
+  const stack: Record<string, number> = {};
   for (const t of s.trades) {
     const col = t.kind === 'straddle' ? C.violet : t.dir > 0 ? C.up : C.down;
+    const hl = !!pv && pv.highlight.includes(t.id);
+    const key = `${t.openedAt}:${t.entry}`;
+    const slot = stack[key] ?? 0;
+    stack[key] = slot + 1;
     const x1 = padL + cw * (nPre + t.openedAt);
     const x2 = Math.min(w - padR, padL + cw * (nPre + s.bar + t.barsLeft));
     const yy = Math.round(y(t.entry)) + 0.5;
+    if (hl && pv && pv.extend) {
+      const x3 = Math.min(w - padR, padL + cw * (nPre + s.bar + t.barsLeft + pv.extend));
+      ctx.strokeStyle = C.amber;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x2, yy);
+      ctx.lineTo(x3, yy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (hl) {
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 10;
+    }
     ctx.strokeStyle = col;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = hl ? 3 : 1.5;
     ctx.setLineDash([5, 4]);
     ctx.beginPath();
     ctx.moveTo(x1, yy);
@@ -224,12 +342,38 @@ function render(ctx: CanvasRenderingContext2D, s: SessionState, w: number, h: nu
     const label = `${t.kind === 'straddle' ? 'X' : t.dir > 0 ? 'L' : 'S'}${t.size}`;
     ctx.font = '700 10px "JetBrains Mono", monospace';
     const tw = ctx.measureText(label).width + 8;
+    const ly = Math.max(padT + 8, yy - slot * 17);
+    if (slot > 0) {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x1 - 2, yy);
+      ctx.lineTo(x1 - 2, ly);
+      ctx.stroke();
+    }
     ctx.fillStyle = col;
-    drawRound(ctx, x1 - tw - 2, yy - 8, tw, 16, 4);
+    drawRound(ctx, x1 - tw - 2, ly - 8, tw, 16, 4);
     ctx.fill();
     ctx.fillStyle = '#0b0f14';
     ctx.textAlign = 'center';
-    ctx.fillText(label, x1 - tw / 2 - 2, yy + 0.5);
+    ctx.fillText(label, x1 - tw / 2 - 2, ly + 0.5);
+    ctx.shadowBlur = 0;
+  }
+
+  if (s.candles.length) {
+    const i = nPre + s.candles.length - 1;
+    const k = candles[i];
+    const last = s.candles[s.candles.length - 1];
+    const mv = last.c - last.o;
+    const cx = xc(i);
+    ctx.globalAlpha = Math.min(1, p * 1.5);
+    ctx.font = '800 12px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = mv > 0 ? C.up : mv < 0 ? C.down : C.flat;
+    const txt = mv > 0 ? `+${mv}` : mv < 0 ? `−${-mv}` : '0';
+    if (mv >= 0) ctx.fillText(txt, cx, Math.max(padT + 8, y(k.h) - 10));
+    else ctx.fillText(txt, cx, Math.min(h - padB - 6, y(k.l) + 12));
+    ctx.globalAlpha = 1;
   }
 
   const py = Math.round(y(lastPrice)) + 0.5;
@@ -250,7 +394,7 @@ function render(ctx: CanvasRenderingContext2D, s: SessionState, w: number, h: nu
   ctx.fillText(String(Math.round(s.base + lastPrice)), w - padR + 2 + (padR - 6) / 2, py + 0.5);
 }
 
-export function Chart({ s, version }: { s: SessionState; version: number }) {
+export function Chart({ s, version, preview }: { s: SessionState; version: number; preview?: Preview | null }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const anim = useRef({ count: s.candles.length, start: 0 });
@@ -284,12 +428,12 @@ export function Chart({ s, version }: { s: SessionState; version: number }) {
     const frame = () => {
       const p = Math.min(1, (performance.now() - anim.current.start) / 480);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      render(ctx, s, size.w, size.h, p);
+      render(ctx, s, size.w, size.h, p, preview ?? null);
       if (p < 1) raf = requestAnimationFrame(frame);
     };
     frame();
     return () => cancelAnimationFrame(raf);
-  }, [version, size, s]);
+  }, [version, size, s, preview]);
 
   return (
     <div class="chart-wrap" ref={wrap}>

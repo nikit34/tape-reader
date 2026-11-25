@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { FxKind, MetaState, RunState, SessionState } from '../engine/types';
-import { newRun, nextBar, playCard, continueFromResult, quarterIndex } from '../engine/game';
+import { newRun, nextBar, playCard, continueFromResult, quarterIndex, pickReward, ringBell } from '../engine/game';
+import { equity } from '../engine/ops';
 import { newSeed } from '../engine/rng';
 import { CARD_IDS } from '../engine/data/cards';
 import { ALGO_IDS } from '../engine/data/algos';
 import { loadMeta, loadRun, saveMeta, saveRun } from './store';
-import { setSound, sfx } from './audio';
+import { setMood, setMusic, setSound, setTension, sfx, unlockAudio, type Mood } from './audio';
 import { DeckModal, TopBar } from './common';
 import { SessionScreen, type Coach } from './screens/Session';
 import { Briefing, BossRewardScreen, EndScreen, ResultScreen, RewardScreen, ShopScreen } from './screens/RunScreens';
@@ -32,7 +33,7 @@ const STEPS: Step[] = [
     text: 'The Lean gauge above the chart shows where the price tends to move on the next bar. It is a tendency, not a promise.',
   },
   {
-    text: 'Play cards with Focus (3 per bar). Buy opens a LONG that profits when the price rises; Sell Short profits when it falls. Click a card or press its number.',
+    text: 'Play cards with Focus (3 per bar). Hover a card first: the chart shows where it wins and loses. Buy opens a LONG that profits when the price rises, Sell Short profits when it falls. Click a card or press its number.',
   },
   {
     when: (s) => s.trades.length > 0 || s.bar > 0,
@@ -76,6 +77,20 @@ export function App() {
     setSound(meta.sound);
   }, [meta.sound]);
 
+  useEffect(() => {
+    setMusic(meta.music);
+  }, [meta.music]);
+
+  useEffect(() => {
+    const unlock = () => unlockAudio();
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
   const markSeen = (run: RunState) => {
     const cards = new Set(metaRef.current.seenCards);
     const algos = new Set(metaRef.current.seenAlgos);
@@ -114,7 +129,7 @@ export function App() {
       }));
     }
     if (run.phase === 'victory') {
-      sfx.win();
+      sfx.victory();
       setMeta((mm) => ({
         ...mm,
         wins: mm.wins + 1,
@@ -122,8 +137,15 @@ export function App() {
       }));
     }
     if (run.phase === 'gameover') sfx.fail();
-    if (run.phase === 'session') setToasts([]);
-    markSeen(run);
+    if (run.phase === 'session') {
+      setToasts([]);
+      sfx.deal();
+    }
+    if (run.phase === 'briefing' && run.quarter === 3) sfx.boss();
+    if (run.phase === 'reward' || run.phase === 'bossreward') sfx.reward();
+    if (prev === 'session' && run.year === 0 && run.quarter === 0 && !metaRef.current.tutorialDone) {
+      setMeta((mm) => ({ ...mm, tutorialDone: true }));
+    }
   };
 
   const consumeFx = (run: RunState) => {
@@ -132,36 +154,58 @@ export function App() {
     if (!list.length) return;
     const now = Date.now();
     setToasts((ts) => [...ts, ...list.map((f) => ({ ...f, id: toastId++, t: now }))].slice(-14));
-    let budget = 3;
+    let gains = 0;
+    let losses = 0;
     for (const f of list) {
-      if (budget <= 0) break;
-      if (f.kind === 'close' || f.kind === 'pnl') {
-        if ((f.value ?? 0) > 0) sfx.profit(f.value ?? 0);
-        else if ((f.value ?? 0) < 0) sfx.loss();
-        budget--;
-      } else if (f.kind === 'heat') {
-        sfx.heat();
-        budget--;
-      } else if (f.kind === 'bad' && list.length === 1) {
-        sfx.bad();
-        budget--;
+      const v = f.value ?? 0;
+      if (f.kind === 'bar') sfx.bar(v);
+      else if (f.kind === 'news') sfx.news(v > 0);
+      else if (f.kind === 'open' && v !== 0) sfx.open(v);
+      else if (f.kind === 'heat') sfx.heat();
+      else if (f.kind === 'bad' && list.length === 1) sfx.bad();
+      else if (f.kind === 'close' || f.kind === 'pnl') {
+        if (v > 0) gains += v;
+        else losses += v;
       }
     }
+    if (gains > 0) sfx.profit(gains);
+    if (losses < 0) sfx.loss(losses);
   };
 
   const act = (fn: (r: RunState) => void) => {
     const run = runRef.current;
     if (!run) return;
     const prev = run.phase;
-    const prevBar = run.session?.bar ?? -1;
-    const prevCards = run.session?.cardsPlayed ?? 0;
+    const s0 = run.session;
+    const prevBar = s0?.bar ?? -1;
+    const prevCards = s0?.cardsPlayed ?? 0;
+    const prevEq = s0 && s0.status === 'play' ? equity(s0) : null;
+    const prevCash = run.cash;
+    const prevShop = run.shop;
     fn(run);
-    if (run.session && run.phase === 'session') {
-      if (run.session.bar !== prevBar) sfx.bar((run.session.candles.at(-1)?.c ?? 0) >= (run.session.candles.at(-1)?.o ?? 0));
-      else if (run.session.cardsPlayed !== prevCards) sfx.card();
+    const s = run.session;
+    if (s && run.phase === 'session') {
+      if (s.bar === prevBar && s.cardsPlayed !== prevCards) sfx.card();
+      if (s.bar !== prevBar) sfx.deal();
+      const eq = equity(s);
+      if (prevEq !== null && prevEq < s.quota && eq >= s.quota) {
+        sfx.quota();
+        run.fx.push({ kind: 'good', text: 'Quota reached: ring the bell or keep trading' });
+      }
+      if (s.bar !== prevBar && eq <= -s.marginLimit * 0.6) {
+        sfx.danger();
+        run.fx.push({ kind: 'bad', text: `Margin call close: ${eq} vs −${s.marginLimit}` });
+      }
+    } else if (prev === 'session' && run.phase === 'result' && run.lastResult?.reason === 'bell') {
+      sfx.bell();
+    } else if (prev === 'shop' && run.phase === 'shop') {
+      if (run.shop !== prevShop) sfx.reroll();
+      else if (run.cash < prevCash) sfx.buy();
+      else sfx.click();
     } else if (prev === run.phase) sfx.click();
     consumeFx(run);
     if (run.phase !== prev) onPhase(run, prev);
+    markSeen(run);
     saveRun(run);
     setVersion((v) => v + 1);
   };
@@ -178,6 +222,7 @@ export function App() {
   };
 
   const toggleSound = () => setMeta((m) => ({ ...m, sound: !m.sound }));
+  const toggleMusic = () => setMeta((m) => ({ ...m, music: !m.music }));
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -202,31 +247,82 @@ export function App() {
     return () => window.clearInterval(id);
   }, []);
 
+  const spaceOwned = useRef(false);
   useEffect(() => {
+    const own = (e: KeyboardEvent) => {
+      e.preventDefault();
+      if (e.code === 'Space') spaceOwned.current = true;
+      const el = document.activeElement;
+      if (el instanceof HTMLElement && el !== document.body) el.blur();
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'Escape') {
         setModal(null);
         return;
       }
-      if (modal) return;
+      if (modal || e.repeat || document.querySelector('.modal-back')) return;
       const run = runRef.current;
       if (screen !== 'game' || !run) return;
-      if (run.phase === 'session') {
+      if (run.phase === 'session' && run.session) {
+        const s = run.session;
         if (e.code === 'Space') {
-          e.preventDefault();
+          own(e);
           act((r) => nextBar(r));
         } else if (/^[1-9]$/.test(e.key)) {
-          act((r) => playCard(r, Number(e.key) - 1));
+          const i = Number(e.key) - 1;
+          if (i < s.hand.length) act((r) => playCard(r, i));
+        } else if (e.key === 'b' || e.key === 'B') {
+          act((r) => ringBell(r));
         } else if (e.key === 'd' || e.key === 'D') setModal('deck');
-      } else if (run.phase === 'result' && e.key === 'Enter') {
-        e.preventDefault();
+      } else if (run.phase === 'result' && (e.key === 'Enter' || e.code === 'Space')) {
+        own(e);
         act((r) => continueFromResult(r));
+      } else if (run.phase === 'reward' && /^[1-3]$/.test(e.key)) {
+        const i = Number(e.key) - 1;
+        if (i < run.rewardCards.length) act((r) => pickReward(r, i));
       } else if (e.key === 'd' || e.key === 'D') setModal('deck');
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && spaceOwned.current) {
+        spaceOwned.current = false;
+        e.preventDefault();
+      }
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+    };
   });
+
+  const run0 = runRef.current;
+  const phase0 = run0?.phase;
+  const bossNow = !!run0?.session?.bossId;
+  useEffect(() => {
+    let mood: Mood = 'menu';
+    if (screen === 'game' && phase0) {
+      if (phase0 === 'session') mood = bossNow ? 'boss' : 'trade';
+      else if (phase0 === 'gameover') mood = 'lose';
+      else if (phase0 === 'victory') mood = 'win';
+      else if (phase0 === 'briefing') mood = 'menu';
+      else mood = 'shop';
+    }
+    setMood(mood);
+  }, [screen, phase0, bossNow]);
+
+  useEffect(() => {
+    const s = runRef.current?.session;
+    if (!s || runRef.current?.phase !== 'session') {
+      setTension(0);
+      return;
+    }
+    const eq = equity(s);
+    const danger = eq < 0 ? Math.min(1, -eq / s.marginLimit) : 0;
+    const behind = s.bar >= 5 && eq < s.quota ? 0.6 : 0;
+    setTension(Math.max(danger, behind));
+  }, [version]);
 
   const run = runRef.current;
   const firstRun = metaRef.current.runs <= 1 && metaRef.current.wins === 0;
@@ -251,13 +347,14 @@ export function App() {
   if (screen === 'title' || (screen === 'game' && !run)) {
     body = (
       <TitleScreen
-        hasRun={!!run && run.phase !== 'gameover' && run.phase !== 'victory'}
+        hasRun={!!run && run.phase !== 'gameover'}
         meta={meta}
         onContinue={() => setScreen('game')}
         onNew={() => setScreen('desks')}
         onHelp={() => setModal('help')}
         onCodex={() => setModal('codex')}
         onSound={toggleSound}
+        onMusic={toggleMusic}
       />
     );
   } else if (screen === 'desks') {
@@ -323,6 +420,7 @@ export function App() {
           meta={meta}
           onClose={() => setModal(null)}
           onSound={toggleSound}
+          onMusic={toggleMusic}
           onHelp={() => setModal('help')}
           onTitle={() => {
             if (runRef.current) saveRun(runRef.current);

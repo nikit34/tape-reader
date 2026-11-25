@@ -67,6 +67,7 @@ export function TitleScreen({
   onHelp,
   onCodex,
   onSound,
+  onMusic,
 }: {
   hasRun: boolean;
   meta: MetaState;
@@ -75,6 +76,7 @@ export function TitleScreen({
   onHelp: () => void;
   onCodex: () => void;
   onSound: () => void;
+  onMusic: () => void;
 }) {
   return (
     <div class="title-screen">
@@ -105,8 +107,11 @@ export function TitleScreen({
             <button type="button" class="btn" onClick={onCodex}>
               <Icon name="deck" size={16} /> Codex & stats
             </button>
-            <button type="button" class="btn" onClick={onSound} aria-label="Toggle sound">
-              <Icon name={meta.sound ? 'sound' : 'mute'} size={16} />
+            <button type="button" class={`btn ${meta.sound ? '' : 'off'}`} onClick={onSound} aria-label="Toggle sound effects">
+              <Icon name={meta.sound ? 'sound' : 'mute'} size={16} /> Sound
+            </button>
+            <button type="button" class={`btn ${meta.music ? '' : 'off'}`} onClick={onMusic} aria-label="Toggle music">
+              <Icon name="music" size={16} /> Music
             </button>
           </div>
         </div>
@@ -208,7 +213,8 @@ export function HelpModal({ onClose }: { onClose: () => void }) {
         <section>
           <h3>Keys</h3>
           <p>
-            <kbd>1</kbd>-<kbd>9</kbd> play a card, <kbd>Space</kbd> next bar, <kbd>Enter</kbd> continue, <kbd>D</kbd> deck, <kbd>Esc</kbd> close.
+            <kbd>1</kbd>-<kbd>9</kbd> play a card, <kbd>Space</kbd> next bar, <kbd>B</kbd> ring the bell, <kbd>Enter</kbd> continue, <kbd>1</kbd>-<kbd>3</kbd> pick a reward,
+            <kbd>D</kbd> deck, <kbd>Esc</kbd> close. Hover a card to preview it on the chart.
           </p>
         </section>
       </div>
@@ -301,6 +307,7 @@ export function MenuModal({
   meta,
   onClose,
   onSound,
+  onMusic,
   onHelp,
   onAbandon,
   onTitle,
@@ -308,6 +315,7 @@ export function MenuModal({
   meta: MetaState;
   onClose: () => void;
   onSound: () => void;
+  onMusic: () => void;
   onHelp: () => void;
   onAbandon: () => void;
   onTitle: () => void;
@@ -323,7 +331,10 @@ export function MenuModal({
           How to play
         </button>
         <button type="button" class="btn" onClick={onSound}>
-          Sound: {meta.sound ? 'on' : 'off'}
+          Sound effects: {meta.sound ? 'on' : 'off'}
+        </button>
+        <button type="button" class="btn" onClick={onMusic}>
+          Music: {meta.music ? 'on' : 'off'}
         </button>
         <button type="button" class="btn" onClick={onTitle}>
           Save and go to title

@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import type { RunState } from '../../engine/types';
 import {
   buyItem,
@@ -79,7 +79,7 @@ export function Briefing({ run, act, firstRun }: { run: RunState; act: Act; firs
                   <VolBars v={(isBoss ? boss!.vol : t.vol) * reg.vol} />
                 </dd>
                 <dt>Headlines</dt>
-                <dd>{isBoss ? (boss!.earnings ? 4 : boss!.swan ? '1 crash' : reg.news) : Math.min(3, t.news + reg.news)}</dd>
+                <dd>{isBoss ? (boss!.earnings ? 4 : boss!.swan ? (reg.news ? `${reg.news} + crash` : 'crash') : reg.news) : Math.min(3, t.news + reg.news)}</dd>
               </dl>
               <button type="button" class="btn primary" onClick={() => act((r) => startSession(r, id))}>
                 Trade {id}
@@ -211,7 +211,17 @@ export function BossRewardScreen({ run, act }: { run: RunState; act: Act }) {
 
 export function ShopScreen({ run, act, firstRun }: { run: RunState; act: Act; firstRun: boolean }) {
   const [mode, setMode] = useState<null | 'remove' | 'upgrade'>(null);
-  const [replaceFor, setReplaceFor] = useState<number | null>(null);
+  const [replaceFor, setReplaceFor] = useState<string | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMode(null);
+        setReplaceFor(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const [msg, setMsg] = useState<string | null>(null);
   const doAct = (fn: (r: RunState) => string | null) =>
     act((r) => {
@@ -260,10 +270,10 @@ export function ShopScreen({ run, act, firstRun }: { run: RunState; act: Act; fi
                     id={it.id}
                     big
                     dim={it.sold || run.cash < it.price}
-                    selected={replaceFor === i}
+                    selected={replaceFor === it.id && !it.sold}
                     onClick={() => {
                       if (it.sold) return;
-                      if (run.algos.length >= run.algoSlots) setReplaceFor(i);
+                      if (run.algos.length >= run.algoSlots) setReplaceFor(it.id);
                       else doAct((r) => buyItem(r, i));
                     }}
                   />
@@ -281,9 +291,12 @@ export function ShopScreen({ run, act, firstRun }: { run: RunState; act: Act; fi
                     id={a}
                     big
                     onClick={() => {
-                      const idx = replaceFor;
+                      const id = replaceFor;
                       setReplaceFor(null);
-                      doAct((r) => buyItem(r, idx, a));
+                      doAct((r) => {
+                        const idx = r.shop.findIndex((x) => x.kind === 'algo' && x.id === id && !x.sold);
+                        return idx < 0 ? 'That algorithm is no longer for sale' : buyItem(r, idx, a);
+                      });
                     }}
                   />
                 ))}
@@ -301,7 +314,15 @@ export function ShopScreen({ run, act, firstRun }: { run: RunState; act: Act; fi
             <button type="button" class="btn" disabled={run.cash < run.upgradeCost} onClick={() => setMode('upgrade')}>
               Upgrade a card · ${run.upgradeCost}
             </button>
-            <button type="button" class="btn" disabled={run.cash < run.rerollCost} onClick={() => doAct((r) => reroll(r))}>
+            <button
+              type="button"
+              class="btn"
+              disabled={run.cash < run.rerollCost}
+              onClick={() => {
+                setReplaceFor(null);
+                doAct((r) => reroll(r));
+              }}
+            >
               Reroll stock · ${run.rerollCost}
             </button>
           </div>

@@ -39,7 +39,7 @@ export interface Candle {
   l: number;
 }
 
-export type FxKind = 'pnl' | 'open' | 'close' | 'heat' | 'info' | 'bad' | 'good';
+export type FxKind = 'pnl' | 'open' | 'close' | 'heat' | 'info' | 'bad' | 'good' | 'news' | 'bar';
 
 export interface Fx {
   kind: FxKind;
@@ -190,5 +190,6 @@ export interface MetaState {
   tutorialDone: boolean;
   tutorialStep: number;
   sound: boolean;
+  music: boolean;
   totalPlayMs: number;
 }

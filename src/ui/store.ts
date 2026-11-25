@@ -17,6 +17,7 @@ export function defaultMeta(): MetaState {
     tutorialDone: false,
     tutorialStep: 0,
     sound: true,
+    music: true,
     totalPlayMs: 0,
   };
 }
@@ -45,7 +46,7 @@ export function loadRun(): RunState | null {
     if (!raw) return null;
     const r = JSON.parse(raw) as RunState;
     if (r.version !== 1) return null;
-    if (r.phase === 'gameover' || r.phase === 'victory') return null;
+    if (r.phase === 'gameover') return null;
     return r;
   } catch {
     return null;

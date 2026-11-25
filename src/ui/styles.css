@@ -162,6 +162,10 @@ kbd {
 .btn.ghost {
   background: transparent;
 }
+.btn.off {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
 .btn.danger {
   border-color: rgba(255, 92, 122, 0.5);
   color: var(--red);
@@ -419,6 +423,17 @@ kbd {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  overflow-x: clip;
+}
+.piles .tip,
+.tb-right .tip {
+  left: auto;
+  right: 0;
+  transform: translateY(4px);
+}
+.piles .tip-wrap:hover .tip,
+.tb-right .tip-wrap:hover .tip {
+  transform: translateY(0);
 }
 .topbar {
   position: sticky;
@@ -1159,7 +1174,8 @@ kbd {
   display: flex;
   align-items: flex-end;
   gap: 14px;
-  padding-top: 12px;
+  padding-top: 22px;
+  position: relative;
 }
 .focus {
   width: 74px;
@@ -1189,12 +1205,22 @@ kbd {
 }
 .hand {
   flex: 1;
+  min-width: 0;
   display: flex;
   gap: 10px;
   justify-content: center;
   align-items: flex-end;
   min-height: 196px;
   padding-top: 12px;
+}
+.hand.crowded {
+  gap: 0;
+}
+.hand.crowded .card + .card {
+  margin-left: -34px;
+}
+.hand.crowded .card:hover {
+  z-index: 6;
 }
 .hand-empty {
   align-self: center;
@@ -1586,6 +1612,80 @@ kbd {
   justify-content: flex-start;
 }
 
+
+.preview-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -6px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 0 90px;
+  min-height: 18px;
+  pointer-events: none;
+}
+.preview-bar b {
+  color: var(--blue);
+  margin-right: 4px;
+}
+.preview-bar.err b {
+  color: var(--red);
+}
+.card-reason {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 22px;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 4px;
+  border-radius: 6px;
+  background: rgba(255, 92, 122, 0.18);
+  color: #ffc2cd;
+}
+.tc-delta {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  animation: flash 1.4s ease both;
+}
+@keyframes flash {
+  0% {
+    transform: scale(1.25);
+    background: rgba(255, 255, 255, 0.18);
+  }
+}
+.trade-chip.hl {
+  box-shadow: 0 0 0 2px var(--amber);
+}
+.trade-chip.expiring {
+  border-style: dashed;
+}
+.pnl-panel.over {
+  border-color: rgba(255, 200, 87, 0.7);
+}
+.pnl-panel.danger {
+  border-color: var(--red);
+  animation: dangerpulse 1.2s ease-in-out infinite;
+}
+@keyframes dangerpulse {
+  50% {
+    box-shadow: 0 0 22px rgba(255, 92, 122, 0.35);
+  }
+}
+.next-btn {
+  flex-direction: column;
+  gap: 2px;
+}
+.next-sub {
+  font-size: 11.5px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
 .mobile-ctl {
   display: none;
 }
@@ -1653,6 +1753,9 @@ kbd {
     font-size: 22px;
   }
   .piles {
+    display: none;
+  }
+  .preview-bar {
     display: none;
   }
   .card {

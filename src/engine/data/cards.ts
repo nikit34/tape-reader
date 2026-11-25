@@ -96,9 +96,14 @@ const LIST: CardDef[] = [
     p: { size: 2, bars: 2 },
     pUp: { size: 3, bars: 2 },
     icon: 'fade',
-    text: (q) => `Open a trade against the last bar: size ${q.size}, ${q.bars} bars.`,
-    play: ({ run, s, p }) => {
+    text: (q) => `Open a trade against the last bar: size ${q.size}, ${q.bars} bars. Flat bar: refund Focus.`,
+    play: ({ run, s, p, paid }) => {
       const d = lastMoveDir(s);
+      if (d === 0) {
+        s.focus += paid;
+        fx(run, 'info', 'Last bar was flat: Focus refunded');
+        return;
+      }
       openTrade(run, s, d > 0 ? -1 : 1, p.size, p.bars, { source: 'Fade the Move' });
     },
   },
@@ -313,6 +318,7 @@ const LIST: CardDef[] = [
         source: 'Double Down',
         kind: t.kind,
         premium: t.premium,
+        exact: true,
       });
     },
   },
@@ -330,7 +336,7 @@ const LIST: CardDef[] = [
     play: ({ run, s, p }) => {
       const winners = s.trades.filter((t) => t.kind === 'dir' && tradePnl(s, t) > 0);
       for (const t of winners) {
-        openTrade(run, s, t.dir, p.size, Math.max(1, t.barsLeft - (s.mods.extraBars ?? 0)), { source: 'Pyramid', free: true });
+        openTrade(run, s, t.dir, p.size, Math.max(1, t.barsLeft - (s.mods.extraBars ?? 0)), { source: 'Pyramid', free: true, exact: true });
       }
       if (!winners.length) fx(run, 'info', 'Pyramid: no trade in profit');
     },
@@ -365,7 +371,7 @@ const LIST: CardDef[] = [
       const dirs = s.trades.filter((t) => t.kind === 'dir');
       for (const t of dirs) {
         closeTrade(run, s, t, 'Flip');
-        openTrade(run, s, (t.dir * -1) as Dir, t.size, p.bars, { source: 'Flip', free: true });
+        openTrade(run, s, (t.dir * -1) as Dir, t.size, p.bars, { source: 'Flip', free: true, exact: true });
       }
     },
   },

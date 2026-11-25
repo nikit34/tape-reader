@@ -18,6 +18,10 @@ export function effMove(s: SessionState, i: number): number {
   return m;
 }
 
+export function isNewsVisibleAt(s: SessionState, n: { bar: number; swan?: boolean }): boolean {
+  return !n.swan || s.bar >= n.bar - 1;
+}
+
 export function currentTrend(s: SessionState): number {
   return s.bar < s.bars ? s.trend[s.bar] : 0;
 }
@@ -68,20 +72,24 @@ export interface OpenOpts {
   kind?: 'dir' | 'straddle';
   premium?: number;
   free?: boolean;
+  exact?: boolean;
 }
 
-export function openTrade(run: RunState, s: SessionState, dir: Dir, size: number, bars: number, opt: OpenOpts): Trade {
-  let sz = size;
-  const kind = opt.kind ?? 'dir';
-  if (!opt.free && s.leverage > 0) {
-    sz *= 2;
-    s.leverage -= 1;
-  }
+export function effectiveSize(run: RunState, s: SessionState, dir: Dir, size: number, kind: 'dir' | 'straddle', leveraged: boolean): number {
+  let sz = leveraged ? size * 2 : size;
   const tr = currentTrend(s);
   if (kind === 'dir' && tr !== 0 && Math.sign(tr) === dir) {
     if (hasAlgo(run, 'trend_follower')) sz += 1;
     if (s.powers.momentum) sz += s.powers.momentum;
   }
+  return sz;
+}
+
+export function openTrade(run: RunState, s: SessionState, dir: Dir, size: number, bars: number, opt: OpenOpts): Trade {
+  const kind = opt.kind ?? 'dir';
+  const leveraged = !opt.free && !opt.exact && s.leverage > 0;
+  if (leveraged) s.leverage -= 1;
+  const sz = opt.exact ? size : effectiveSize(run, s, dir, size, kind, leveraged);
   const t: Trade = {
     id: s.nextTradeId++,
     dir,
@@ -94,11 +102,11 @@ export function openTrade(run: RunState, s: SessionState, dir: Dir, size: number
     openedAt: s.bar,
   };
   s.trades.push(t);
-  fx(run, 'open', `${tradeLabel(t)} opened`, sz);
+  fx(run, 'open', `${tradeLabel(t)} opened`, kind === 'straddle' ? 0 : dir * sz);
   if (!opt.free) {
     if (hasAlgo(run, 'spread_bot')) gainPnl(run, s, 1, 'Spread Bot');
     if (hasAlgo(run, 'copy_trader') && rnd(run.rng) < 0.3) {
-      openTrade(run, s, dir, size, bars, { ...opt, source: 'Copy Trader', free: true });
+      openTrade(run, s, dir, sz, bars, { ...opt, source: 'Copy Trader', free: true, exact: true });
     }
   }
   return t;

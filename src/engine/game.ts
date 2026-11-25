@@ -21,6 +21,7 @@ import {
   fx,
   gainPnl,
   hasAlgo,
+  isNewsVisibleAt,
   openTrade,
   reveal,
   tradePnl,
@@ -251,7 +252,7 @@ function beginBar(run: RunState, s: SessionState): void {
 }
 
 export function isNewsVisible(s: SessionState, n: NewsEvent): boolean {
-  return !n.swan || s.bar >= n.bar - 1;
+  return isNewsVisibleAt(s, n);
 }
 
 export function cardCost(run: RunState, s: SessionState, c: CardInst): number {
@@ -261,11 +262,14 @@ export function cardCost(run: RunState, s: SessionState, c: CardInst): number {
   return cost;
 }
 
+export const MAX_PLAYS_PER_BAR = 12;
+
 export function canPlay(run: RunState, i: number): string | null {
   const s = run.session;
   if (!s || s.status !== 'play') return 'Session is over';
   const c = s.hand[i];
   if (!c) return 'No card';
+  if (s.cardsThisBar >= MAX_PLAYS_PER_BAR) return `Max ${MAX_PLAYS_PER_BAR} cards per bar`;
   if (cardCost(run, s, c) > s.focus) return 'Not enough Focus';
   if (CARDS[c.id].needsTrade && s.trades.length === 0) return 'Needs an open trade';
   return null;
@@ -303,18 +307,20 @@ export function nextBar(run: RunState): void {
   const c = o + move;
   const [w1, w2] = s.wicks[i];
   s.candles.push({ o, c, h: Math.max(o, c) + w1, l: Math.min(o, c) - w2 });
+  fx(run, 'bar', `Bar ${i + 1} closes ${move > 0 ? 'up' : move < 0 ? 'down' : 'flat'}`, move);
 
+  const before = s.hedgePct > 0 ? s.trades.map((t) => tradePnl(s, t)) : [];
+  s.price = c;
   if (s.hedgePct > 0) {
     let saved = 0;
-    for (const t of s.trades) {
-      const d = t.kind === 'dir' ? t.dir * t.size * move : 0;
+    s.trades.forEach((t, k) => {
+      const d = tradePnl(s, t) - before[k];
       if (d < 0) saved += (-d * s.hedgePct) / 100;
-    }
+    });
     saved = Math.round(saved);
     if (saved > 0) gainPnl(run, s, saved, 'Hedge');
   }
-  s.price = c;
-  for (const n of s.news) if (n.bar === i) fx(run, n.move > 0 ? 'good' : 'bad', `${n.title}: ${n.move > 0 ? '+' : ''}${n.move}`);
+  for (const n of s.news) if (n.bar === i) fx(run, 'news', `${n.title}: ${n.move > 0 ? '+' : ''}${n.move}`, n.move);
   if (hasAlgo(run, 'whale_watcher') && Math.abs(move) >= 5) {
     const riding = s.trades.some((t) => (t.kind === 'dir' && t.dir === Math.sign(move)) || t.kind === 'straddle');
     if (riding) gainPnl(run, s, 4, 'Whale Watcher');
@@ -328,7 +334,7 @@ export function nextBar(run: RunState): void {
   for (const t of [...s.trades]) if (t.barsLeft <= 0) closeTrade(run, s, t, 'Expired');
   s.bar++;
   if (hasAlgo(run, 'mean_reverter') && Math.abs(move) >= 4 && s.bar < s.bars) {
-    openTrade(run, s, move > 0 ? -1 : 1, 2, 1, { source: 'Mean Reverter', free: true });
+    openTrade(run, s, move > 0 ? -1 : 1, 2, 1, { source: 'Mean Reverter', free: true, exact: true });
   }
 
   if (equity(s) <= -s.marginLimit) {
@@ -336,7 +342,7 @@ export function nextBar(run: RunState): void {
       run.algos = run.algos.filter((a) => a !== 'golden_parachute');
       s.parachuted = true;
       for (const t of [...s.trades]) closeTrade(run, s, t, 'Parachute');
-      s.marginLimit *= 2;
+      s.marginLimit = Math.max(s.marginLimit * 2, Math.ceil(-equity(s)) + s.marginLimit);
       fx(run, 'good', 'Golden Parachute deployed');
     } else {
       endSession(run, 'margin');
@@ -381,7 +387,7 @@ function computeResult(run: RunState, s: SessionState, reason: 'bell' | 'close' 
   const cap = hasAlgo(run, 'interest_engine') ? 10 : 5;
   const interest = Math.min(cap, Math.floor(Math.max(0, run.cash) / 5));
   const extra = hasAlgo(run, 'tax_haven') ? 3 : 0;
-  if (hasAlgo(run, 'tax_haven')) run.heat += 1;
+  if (hasAlgo(run, 'tax_haven')) addHeat(run, s, 1);
   let trustLost = 0;
   let insuranceSaved = false;
   if (!won) {
@@ -451,7 +457,7 @@ export function continueFromResult(run: RunState): void {
     run.phase = 'gameover';
     return;
   }
-  const boss = !!run.lastResult?.boss;
+  const boss = !!run.lastResult?.boss && !!run.lastResult?.won;
   const weights = boss ? { uncommon: 65, rare: 35 } : { common: 58, uncommon: 34, rare: 8 };
   const ids: string[] = [];
   for (let k = 0; k < 3; k++) ids.push(rollCardId(run, weights, ids));
@@ -468,6 +474,10 @@ export function pickReward(run: RunState, idx: number | null): void {
     if (c) addCard(run, c.id, c.up);
   }
   run.rewardCards = [];
+  if (run.lastResult?.boss && !run.lastResult.won) {
+    finishQuarterRewards(run);
+    return;
+  }
   if (run.lastResult?.boss) {
     const ids: string[] = [];
     for (let k = 0; k < 3; k++) {
@@ -476,6 +486,14 @@ export function pickReward(run: RunState, idx: number | null): void {
     }
     run.rewardAlgos = ids;
     run.phase = 'bossreward';
+    return;
+  }
+  openShop(run);
+}
+
+function finishQuarterRewards(run: RunState): void {
+  if (run.quarter === 3 && run.year === YEARS_TO_WIN - 1 && !run.endless) {
+    run.phase = 'victory';
     return;
   }
   openShop(run);
@@ -491,11 +509,7 @@ export function pickBossAlgo(run: RunState, id: string | null, replace?: string)
     run.algos.push(id);
   }
   run.rewardAlgos = [];
-  if (run.year === YEARS_TO_WIN - 1 && !run.endless) {
-    run.phase = 'victory';
-    return;
-  }
-  openShop(run);
+  finishQuarterRewards(run);
 }
 
 export function goEndless(run: RunState): void {

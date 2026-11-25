@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { RunState } from '../../engine/types';
 import { canPlay, canRingBell, cardCost, isNewsVisible, nextBar, playCard, ringBell } from '../../engine/game';
 import { currentTrend, equity, tradeLabel, tradePnl, unrealized } from '../../engine/ops';
+import { cardPreview } from '../../engine/preview';
+import { sfx } from '../audio';
 import { BOSSES, TICKERS } from '../../engine/data/market';
 import { Chart } from '../Chart';
 import { CardView, Tip, fmtSigned } from '../common';
@@ -69,6 +71,15 @@ export function SessionScreen({
   const ddPct = eq < 0 ? Math.min(100, (-eq / s.marginLimit) * 100) : 0;
   const bell = canRingBell(run);
   const upcoming = s.news.filter((n) => n.bar >= s.bar && isNewsVisible(s, n));
+  const [hover, setHover] = useState<number | null>(null);
+  const hoverIdx = hover !== null ? s.hand.findIndex((c) => c.uid === hover) : -1;
+  const hoverCard = hoverIdx >= 0 ? s.hand[hoverIdx] : undefined;
+  const preview = hoverCard && s.status === 'play' ? cardPreview(run, s, hoverCard) : null;
+  const hoverErr = hoverCard ? canPlay(run, hoverIdx) : null;
+  const lastCandle = s.candles[s.candles.length - 1];
+  const lastMove = lastCandle ? lastCandle.c - lastCandle.o : 0;
+  const danger = eq <= -s.marginLimit * 0.6;
+  const closingNext = s.trades.filter((tr) => tr.barsLeft === 1).length;
 
   const effects: { label: string; tip: string }[] = [];
   if (s.nextBarBonus) effects.push({ label: `Next bar ${fmtSigned(s.nextBarBonus)}`, tip: 'Pump It / Dump It will push the next bar.' });
@@ -118,18 +129,25 @@ export function SessionScreen({
             </div>
           </div>
         )}
-        <Chart s={s} version={version} />
+        <Chart s={s} version={version} preview={preview} />
         <div class="trades-row">
           {s.trades.length === 0 && <span class="muted small">No open trades. Order cards open trades at the current price.</span>}
           {s.trades.map((tr) => {
             const v = tradePnl(s, tr);
+            const delta = lastCandle && tr.openedAt < s.bar && tr.kind === 'dir' ? lastMove * tr.dir * tr.size : null;
+            const hl = preview?.highlight.includes(tr.id);
             return (
-              <div class={`trade-chip ${tr.kind === 'straddle' ? 'straddle' : tr.dir > 0 ? 'long' : 'short'}`}>
+              <div class={`trade-chip ${tr.kind === 'straddle' ? 'straddle' : tr.dir > 0 ? 'long' : 'short'} ${hl ? 'hl' : ''} ${tr.barsLeft === 1 ? 'expiring' : ''}`} key={tr.id}>
                 <span class="tc-label">{tradeLabel(tr)}</span>
                 <span class="tc-meta">
-                  @{s.base + tr.entry} · {tr.barsLeft} bar{tr.barsLeft === 1 ? '' : 's'}
+                  @{s.base + tr.entry} · {tr.barsLeft === 1 ? 'closes next bar' : `${tr.barsLeft} bars left`}
                 </span>
                 <span class={`tc-pnl ${v > 0 ? 'pos' : v < 0 ? 'neg' : ''}`}>{fmtSigned(v)}</span>
+                {delta !== null && delta !== 0 && (
+                  <span class={`tc-delta ${delta > 0 ? 'pos' : 'neg'}`} key={`${tr.id}-${s.bar}`}>
+                    {fmtSigned(delta)} last bar
+                  </span>
+                )}
               </div>
             );
           })}
@@ -148,7 +166,7 @@ export function SessionScreen({
       </section>
 
       <aside class="sess-side">
-        <div class="pnl-panel">
+        <div class={`pnl-panel ${danger ? 'danger' : ''} ${bell ? 'over' : ''}`}>
           <div class="pnl-label">Quarter P&L</div>
           <div class={`pnl-big ${eq > 0 ? 'pos' : eq < 0 ? 'neg' : ''}`}>{fmtSigned(shown)}</div>
           <div class="pnl-sub">
@@ -184,8 +202,19 @@ export function SessionScreen({
             Bar {Math.min(s.bar + 1, s.bars)}/{s.bars}
           </span>
         </div>
-        <button type="button" class="btn primary big" onClick={() => act((r) => nextBar(r))}>
-          {s.bar === s.bars - 1 ? 'Close the quarter' : 'Next bar'} <kbd>Space</kbd>
+        <button type="button" class="btn primary big next-btn" onClick={() => act((r) => nextBar(r))}>
+          <span>
+            {s.bar === s.bars - 1 ? 'Close the quarter' : 'Next bar'} <kbd>Space</kbd>
+          </span>
+          <span class="next-sub">
+            {s.bar === s.bars - 1
+              ? 'All open trades close at the final price'
+              : s.trades.length
+                ? `${s.trades.length} open${closingNext ? `, ${closingNext} close${closingNext > 1 ? '' : 's'} after this bar` : ''}${s.focus > 0 && s.hand.length ? ` · ${s.focus} Focus unspent` : ''}`
+                : s.focus > 0 && s.hand.length
+                  ? `No trades open · ${s.focus} Focus unspent`
+                  : 'The price moves one bar'}
+          </span>
         </button>
         <Tip tip="You are over the quota: end the quarter now and bank everything. Staying in can earn bonus cash, or lose it.">
           <button type="button" class={`btn bell ${bell ? 'ready' : ''}`} disabled={!bell} onClick={() => act((r) => ringBell(r))}>
@@ -214,13 +243,22 @@ export function SessionScreen({
       </aside>
 
       <footer class="hand-area">
+        <div class={`preview-bar ${hoverErr ? 'err' : ''}`} aria-live="polite">
+          {preview ? (
+            <>
+              <b>{hoverErr ? `Can't play: ${hoverErr}.` : 'Preview'}</b> {preview.text}
+            </>
+          ) : s.status === 'play' ? (
+            <span class="muted">Hover a card to see exactly what it will do on the chart. Press its number to play it, Space for the next bar.</span>
+          ) : null}
+        </div>
         <Tip tip="Focus pays for cards. You get 3 every bar; unspent Focus does not carry over.">
           <div class="focus">
             <span class="focus-num">{s.focus}</span>
             <span class="focus-label">Focus</span>
           </div>
         </Tip>
-        <div class="hand">
+        <div class={`hand ${s.hand.length > 6 ? 'crowded' : ''}`}>
           {s.hand.map((c, i) => {
             const err = canPlay(run, i);
             return (
@@ -233,6 +271,10 @@ export function SessionScreen({
                 reason={err}
                 hotkey={i < 9 ? i + 1 : undefined}
                 onClick={() => act((r) => playCard(r, i))}
+                onHover={(on) => {
+                  setHover(on ? c.uid : null);
+                  if (on) sfx.hover();
+                }}
                 extraClass="in-hand"
               />
             );
