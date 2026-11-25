@@ -13,7 +13,7 @@ export const REGIMES: Regime[] = [
   {
     id: 'bull',
     name: 'Bull Market',
-    drift: 0.4,
+    drift: 0.3,
     vol: 1.0,
     flip: 0.3,
     news: 0,
@@ -178,7 +178,7 @@ export const BOSSES: BossDef[] = [
     id: 'circuit',
     name: 'Circuit Breaker',
     ticker: 'PTRX',
-    desc: 'Every bar is capped at 3 points. Trends are sticky and trades last 1 bar longer.',
+    desc: 'Every bar is capped at 3 points and trades last 1 bar longer. Mid-quarter the breaker trips and the trend reverses.',
     vol: 1.3,
     flip: 0.1,
     cap: 3,
@@ -200,7 +200,7 @@ export function bossFor(year: number): BossDef {
 }
 
 const BASE_QUOTA = [
-  [16, 26, 36, 52],
+  [16, 28, 40, 56],
   [55, 70, 82, 95],
   [125, 150, 165, 230],
 ];

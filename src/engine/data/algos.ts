@@ -23,7 +23,7 @@ const LIST: AlgoDef[] = [
   { id: 'whale_watcher', name: 'Whale Watcher', short: 'WW', rarity: 'uncommon', price: 7, text: 'When a bar moves 5+ points and you hold a trade riding it, +4 P&L.' },
   { id: 'backtester', name: 'Backtester', short: 'BT', rarity: 'uncommon', price: 6, text: 'Each session starts with the first 2 bars revealed.' },
   { id: 'dark_pool', name: 'Dark Pool', short: 'DP', rarity: 'uncommon', price: 7, text: 'Profitable trades of size 4+ pay 25% more.' },
-  { id: 'copy_trader', name: 'Copy Trader', short: 'CT', rarity: 'uncommon', price: 7, text: 'Opening a trade has a 30% chance to open a free copy of it.' },
+  { id: 'copy_trader', name: 'Copy Trader', short: 'CT', rarity: 'uncommon', price: 7, text: 'Opening a trade has a 30% chance to open a free half-size copy of it.' },
   { id: 'golden_parachute', name: 'Golden Parachute', short: 'GP', rarity: 'uncommon', price: 6, text: 'Cancels your next margin call: trades close and the margin limit moves far enough out to keep trading. Then it is gone.' },
   { id: 'sentiment', name: 'Sentiment NLP', short: 'NL', rarity: 'uncommon', price: 7, text: 'Read the Tape, Backtest and Technical Analysis cost 0.' },
   { id: 'latency_arb', name: 'Latency Arb', short: 'LA', rarity: 'rare', price: 9, text: 'The first card you play each bar costs 0.' },

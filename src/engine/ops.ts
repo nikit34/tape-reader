@@ -18,6 +18,18 @@ export function effMove(s: SessionState, i: number): number {
   return m;
 }
 
+export function shownMove(s: SessionState, i: number): number {
+  let m = s.plan[i] ?? 0;
+  for (const n of s.news) if (n.bar === i && n.known && isNewsVisibleAt(s, n)) m += n.move;
+  if (i === s.bar) m += s.nextBarBonus;
+  if (s.mods.cap) m = clamp(m, -s.mods.cap, s.mods.cap);
+  return m;
+}
+
+export function hiddenHeadline(s: SessionState, i: number): boolean {
+  return s.news.some((n) => n.bar === i && (!n.known || !isNewsVisibleAt(s, n)));
+}
+
 export function isNewsVisibleAt(s: SessionState, n: { bar: number; swan?: boolean }): boolean {
   return !n.swan || s.bar >= n.bar - 1;
 }
@@ -106,7 +118,7 @@ export function openTrade(run: RunState, s: SessionState, dir: Dir, size: number
   if (!opt.free) {
     if (hasAlgo(run, 'spread_bot')) gainPnl(run, s, 1, 'Spread Bot');
     if (hasAlgo(run, 'copy_trader') && rnd(run.rng) < 0.3) {
-      openTrade(run, s, dir, sz, bars, { ...opt, source: 'Copy Trader', free: true, exact: true });
+      openTrade(run, s, dir, Math.ceil(sz / 2), bars, { ...opt, source: 'Copy Trader', free: true, exact: true });
     }
   }
   return t;

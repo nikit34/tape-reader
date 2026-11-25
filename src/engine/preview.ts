@@ -81,11 +81,11 @@ export function cardPreview(run: RunState, s: SessionState, c: CardInst): Previe
       break;
     case 'read_tape':
       out.reveal = [s.bar];
-      out.text = `Shows whether bar ${nextBar} closes up or down, then draws ${p.draw} card.`;
+      out.text = `Shows which way the market pushes bar ${nextBar}, then draws ${p.draw} card. A hidden headline on that bar can still flip it.`;
       break;
     case 'ta': {
       for (let k = 0; k < p.n && s.bar + k < s.bars; k++) out.reveal.push(s.bar + k);
-      out.text = `Shows the direction of bars ${nextBar}-${s.bar + out.reveal.length}.`;
+      out.text = `Shows the market direction of bars ${nextBar}-${s.bar + out.reveal.length}. Hidden headlines are not included.`;
       break;
     }
     case 'backtest':

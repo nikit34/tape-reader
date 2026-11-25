@@ -184,6 +184,15 @@ export function startSession(run: RunState, tickerId: string): void {
       plan[i] = mv(trend[i]);
     }
   }
+  if (boss?.cap) {
+    const k = randInt(r, 3, 5);
+    const prev = trend[k - 1];
+    const flipped = prev === 0 ? (rnd(r) < 0.5 ? 2 : -2) : -Math.sign(prev) * Math.max(1, Math.abs(prev));
+    for (let i = k; i < bars; i++) {
+      trend[i] = flipped;
+      plan[i] = mv(flipped);
+    }
+  }
   news.sort((a, b) => a.bar - b.bar);
 
   const s: SessionState = {

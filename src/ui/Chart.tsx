@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Candle, SessionState } from '../engine/types';
-import { effMove } from '../engine/ops';
+import { hiddenHeadline, shownMove } from '../engine/ops';
 import { isNewsVisible } from '../engine/game';
 import type { Preview } from '../engine/preview';
 
@@ -135,7 +135,7 @@ function render(ctx: CanvasRenderingContext2D, s: SessionState, w: number, h: nu
       ctx.setLineDash([]);
     }
     if (s.revealed.includes(i)) {
-      const m = effMove(s, i);
+      const m = shownMove(s, i);
       const cx = x0 + ww / 2;
       const cy = padT + plotH / 2;
       const sz = Math.min(ww * 0.36, 14);
@@ -158,6 +158,10 @@ function render(ctx: CanvasRenderingContext2D, s: SessionState, w: number, h: nu
       ctx.font = '700 9px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
       ctx.fillText(m > 0 ? 'UP' : m < 0 ? 'DOWN' : 'FLAT', cx, cy + sz + 12);
+      if (hiddenHeadline(s, i)) {
+        ctx.fillStyle = C.amber;
+        ctx.fillText('+ NEWS ?', cx, cy + sz + 24);
+      }
     }
   }
 

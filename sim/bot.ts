@@ -12,7 +12,7 @@ import {
   upgradeCard,
 } from '../src/engine/game';
 import { CARDS } from '../src/engine/data/cards';
-import { currentTrend, effMove, tradePnl } from '../src/engine/ops';
+import { currentTrend, shownMove, tradePnl } from '../src/engine/ops';
 import type { RunState, SessionState } from '../src/engine/types';
 
 const CARD_RANK: Record<string, number> = {
@@ -73,7 +73,7 @@ const ALGO_RANK = [
 ];
 
 function predictedDir(s: SessionState): number {
-  if (s.revealed.includes(s.bar)) return Math.sign(effMove(s, s.bar));
+  if (s.revealed.includes(s.bar)) return Math.sign(shownMove(s, s.bar));
   const n = s.news.find((x) => x.bar === s.bar && x.known);
   if (n) return Math.sign(n.move + s.trend[s.bar]);
   return Math.sign(currentTrend(s));

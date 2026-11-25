@@ -3,7 +3,7 @@ import {
   closeTrade,
   currentTrend,
   drawCards,
-  effMove,
+  shownMove,
   fx,
   gainPnl,
   lastMoveDir,
@@ -143,7 +143,7 @@ const LIST: CardDef[] = [
     p: { draw: 1 },
     pUp: { draw: 1 },
     icon: 'eye',
-    text: (q) => `Reveal the direction of the next bar. Draw ${q.draw}.`,
+    text: (q) => `Reveal the market direction of the next bar. Headlines stay hidden. Draw ${q.draw}.`,
     play: ({ run, s, p }) => {
       reveal(s, s.bar);
       drawCards(run, s, p.draw);
@@ -158,7 +158,7 @@ const LIST: CardDef[] = [
     p: { n: 3 },
     pUp: { n: 5 },
     icon: 'chart',
-    text: (q) => `Reveal the direction of the next ${q.n} bars.`,
+    text: (q) => `Reveal the market direction of the next ${q.n} bars. Headlines stay hidden.`,
     play: ({ s, p }) => {
       for (let k = 0; k < p.n; k++) reveal(s, s.bar + k);
     },
@@ -175,9 +175,9 @@ const LIST: CardDef[] = [
     text: (q) => `Reveal the next bar and open a size ${q.size} trade its way for 1 bar.`,
     play: ({ run, s, p }) => {
       reveal(s, s.bar);
-      const m = effMove(s, s.bar);
+      const m = shownMove(s, s.bar);
       if (m === 0) {
-        fx(run, 'info', 'Backtest: next bar is flat');
+        fx(run, 'info', 'Backtest: the market is flat next bar');
         return;
       }
       openTrade(run, s, m > 0 ? 1 : -1, p.size, 1, { source: 'Backtest' });
